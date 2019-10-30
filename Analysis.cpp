@@ -1,0 +1,146 @@
+#include <iostream>
+#include <opencv2/opencv.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#include <vector>
+#include <cmath>
+#include <deque>
+#include <string>
+using namespace cv;
+
+void MycalcHist(std::string s, Mat images, MatND &dst){
+    if(s == "Y"){
+        int histBinNum = 255;
+        float range[] = {0, 255};
+        const float * histRange = { range };
+        Mat buf;
+        cvtColor(images, buf, CV_BGR2YCrCb);
+        std::vector<Mat> channals;
+        split(buf, channals);
+        Mat Y = channals.at(0);
+        calcHist(&Y,
+                 1,0,Mat(),
+                 dst,
+                 1, &histBinNum,
+                 &histRange, true, true);
+    }
+    else{
+        int histBinNum = 255;
+        float range[] = {0, 255};
+        const float * histRange = { range };
+        Mat buf;
+        cvtColor(images, buf, CV_BGR2GRAY);
+        //std::vector<Mat> channals;
+        //split(buf, channals);
+        //Mat Y = channals.at(0);
+        calcHist(&buf,
+                 1,0,Mat(),
+                 dst,
+                 1, &histBinNum,
+                 &histRange, true, true);
+    }
+}
+
+void DrawHist(const MatND &src, Mat &dst, int hpt, double MaxValue){
+    for(int i = 0; i < 256; i++){
+        float BinValue = src.at<float>(i);
+        int RealValue = saturate_cast<int>(256 *(1 - BinValue/MaxValue) ); //( BinValue * hpt/ MaxValue  );
+        //line(dst,Point(i, 255), Point(i, 256 - RealValue), Scalar(255));
+        rectangle(dst, Point(i,256-1),Point((i+1)-1,RealValue),Scalar(255));
+    }
+}
+
+int main(int argc, char** argv)
+{
+    if(argc < 2){
+        std::cout<<"Please the video path."<<std::endl;
+        return 0;
+    }
+    VideoCapture Cap(argv[1]);
+    if(!Cap.isOpened()){
+        std::cout<<"Open file false"<<std::endl;
+        return 0;
+    }
+    std::string s = argv[2];
+    std::deque<Mat> FrameRGB;
+    while(true){
+        Mat buf;
+        Cap>> buf;
+        if(buf.empty())
+            break;
+        else
+            FrameRGB.push_back(buf);
+    }
+    bool broadcast = false;
+    namedWindow("Video",1); 
+    namedWindow("Hist",1);//1 means auto windows size
+    namedWindow("Gray",1);
+    //namedWindow("Y", 1);
+    namedWindow("Threshold",1);
+    //namedWindow("SEG",1);
+    std::deque<Mat>::iterator iter = FrameRGB.begin();
+    do{
+       imshow("Video", *iter);  
+       MatND histogram;
+       MycalcHist(s, *iter,histogram);
+       Mat histogramImage(256,256,CV_8U,Scalar(0));
+       int hpt = saturate_cast<int>(0.9 * 256);
+       double MaxValue = 0;
+       double MinValue = 0; 
+       minMaxLoc(histogram,&MinValue, &MaxValue, 0, 0);
+       DrawHist(histogram, histogramImage, hpt, MaxValue);
+       imshow("Hist", histogramImage);
+       char key = waitKey(1);
+       Mat Gray;
+       cvtColor(*iter,Gray, CV_BGR2GRAY);
+       imshow("Gray",Gray);
+       
+       Mat bw;
+       //adaptiveThreshold(Gray, bw, 255, CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 599, 0);
+       threshold(Gray, bw, 0, 255, CV_THRESH_OTSU); //very good!
+       imshow("Threshold", bw);
+       //Y channals;
+       //Mat Y;
+       //Mat YCrCb;
+       //std::vector<Mat> channals;
+       //cvtColor(*iter, YCrCb, CV_BGR2YCrCb);
+       //split(YCrCb ,channals);
+       //Y = channals[0];
+       //imshow("Y", Y); 
+       
+       //Segamatation
+       //Mat seg;
+       //pyrMeanShiftFiltering(*iter, seg, 15, 10, 1, TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 5, 1));
+       //imshow("SEG",seg);
+       //front
+       if(key == 'l' && broadcast == false){ 
+           iter++;
+           if(iter == FrameRGB.end()){
+               iter = FrameRGB.begin();
+               std::cout<<"Start"<<std::endl;
+           }
+       }
+       //back
+       else if(key == ';' && broadcast == false){
+           iter--;
+           if(iter == FrameRGB.begin()-1){
+               iter = FrameRGB.end()-1;
+               std::cout<<"End"<<std::endl;
+           }
+           
+       }
+       else if(key == ' ')
+           broadcast = !broadcast;
+       else if(key == 'q')
+           break;
+       else{
+
+       }
+       if(broadcast)
+           iter++;
+
+        
+    }while(true);
+    return 0;
+}
+
