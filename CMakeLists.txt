@@ -10,9 +10,9 @@ if(NOT OpenCV_FOUND)
     message(FATAL_ERROR "\n\n Opencv2 is missing") 
 endif()
 
-include_directories(${OpenCV_INCLUDE_DIRS})
+include_directories(${OpenCV_INCLUDE_DIRS} .)
 
-add_executable(Analysis Analysis.cpp)
+add_executable(Analysis Analysis.cpp opticalflow.cpp)
 set_property(TARGET Analysis PROPERTY CXX_STANDARD 11)
 target_link_libraries(Analysis ${OpenCV_LIBS})
 #include_directories(Analysis)

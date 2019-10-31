@@ -6,6 +6,7 @@
 #include <cmath>
 #include <deque>
 #include <string>
+#include "OpticalFlow.hpp"
 using namespace cv;
 
 void MycalcHist(std::string s, Mat images, MatND &dst){
@@ -74,11 +75,12 @@ int main(int argc, char** argv)
     bool broadcast = false;
     namedWindow("Video",1); 
     namedWindow("Hist",1);//1 means auto windows size
-    namedWindow("Gray",1);
-    //namedWindow("Y", 1);
+    //namedWindow("Gray",1);
+    namedWindow("Y", 1);
     namedWindow("Threshold",1);
     //namedWindow("SEG",1);
     std::deque<Mat>::iterator iter = FrameRGB.begin();
+    auxiliary::OpticalFlow myOpti(true);
     do{
        imshow("Video", *iter);  
        MatND histogram;
@@ -91,22 +93,41 @@ int main(int argc, char** argv)
        DrawHist(histogram, histogramImage, hpt, MaxValue);
        imshow("Hist", histogramImage);
        char key = waitKey(1);
-       Mat Gray;
-       cvtColor(*iter,Gray, CV_BGR2GRAY);
-       imshow("Gray",Gray);
+       //Mat Gray;
+       //cvtColor(*iter,Gray, CV_BGR2GRAY);
+       //imshow("Gray",Gray);
+
+       //Y channals;
+       Mat Y;
+       Mat YCrCb;
+       std::vector<Mat> channals;
+       cvtColor(*iter, YCrCb, CV_BGR2YCrCb);
+       Scalar YCrCbMean = mean(YCrCb);
+       split(YCrCb ,channals);
+       double LumenMean = YCrCbMean[0];
+       Y = channals[0];
+       CvFont font; 
+       cvInitFont(&font,CV_FONT_HERSHEY_PLAIN,1.0,1.0,0,2,8); 
+       std::string Slumen = std::to_string(LumenMean);
+       char *c = new char[Slumen.size()];
+       strcpy(c, Slumen.data());
+       IplImage  tmp = IplImage(Y);
+       CvArr * arr = (CvArr* )&tmp;
+       cvPutText(arr, c,  cvPoint(10,10), &font, CV_RGB(0,255,0));
+       imshow("Y", Y); 
        
        Mat bw;
        //adaptiveThreshold(Gray, bw, 255, CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 599, 0);
-       threshold(Gray, bw, 0, 255, CV_THRESH_OTSU); //very good!
+       threshold(Y, bw, 0, 255, CV_THRESH_OTSU); //very good!
        imshow("Threshold", bw);
-       //Y channals;
-       //Mat Y;
-       //Mat YCrCb;
-       //std::vector<Mat> channals;
-       //cvtColor(*iter, YCrCb, CV_BGR2YCrCb);
-       //split(YCrCb ,channals);
-       //Y = channals[0];
-       //imshow("Y", Y); 
+
+       myOpti.GetImage(*iter);
+       if(myOpti.ReturnTrackPointsSize() > 0)
+           myOpti.OpticalTracking();
+       if(myOpti.ReturnisFindFeature())
+           myOpti.FindFeaturePoints();
+       myOpti.Update();
+
        
        //Segamatation
        //Mat seg;
@@ -120,6 +141,7 @@ int main(int argc, char** argv)
                std::cout<<"Start"<<std::endl;
            }
        }
+
        //back
        else if(key == ';' && broadcast == false){
            iter--;
