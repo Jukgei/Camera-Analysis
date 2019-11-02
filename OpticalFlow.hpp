@@ -74,6 +74,8 @@ private:
     std::vector<Point2i> Normal;
 
     int PatchSize; //used to detection shadow, Radius
+
+    double isNiceThreshold1;
 };
 
 }
